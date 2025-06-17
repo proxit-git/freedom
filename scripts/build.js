@@ -3,13 +3,13 @@ import { join, dirname as pathDirname } from 'path';
 import { fileURLToPath } from 'url';
 import { build } from 'esbuild';
 import { globSync } from 'glob';
-import { minify as jsMinify } from 'terser';
-import { minify as htmlMinify } from 'html-minifier';
+// Removed: import { minify as jsMinify } from 'terser';
+// Removed: import { minify as htmlMinify } from 'html-minifier';
 import JSZip from "jszip";
-import obfs from 'javascript-obfuscator';
+// Removed: import obfs from 'javascript-obfuscator';
 
 const env = process.env.NODE_ENV || 'production';
-const devMode = env !== 'production';
+const devMode = env !== 'production'; // This variable will now effectively just determine if we use the original code
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = pathDirname(__filename);
@@ -29,21 +29,19 @@ async function processHtmlPages() {
         const styleCode = readFileSync(base('style.css'), 'utf8');
         const scriptCode = readFileSync(base('script.js'), 'utf8');
 
-        const finalScriptCode = await jsMinify(scriptCode);
+        // Original scriptCode is used directly, no minification
+        const finalScriptCode = scriptCode;
         const finalHtml = indexHtml
             .replace(/__STYLE__/g, `<style>${styleCode}</style>`)
-            .replace(/__SCRIPT__/g, finalScriptCode.code);
+            .replace(/__SCRIPT__/g, finalScriptCode); // Removed .code as it's not minified by terser
 
-        const minifiedHtml = htmlMinify(finalHtml, {
-            collapseWhitespace: true,
-            removeAttributeQuotes: true,
-            minifyCSS: true
-        });
+        // No HTML minification
+        const unminifiedHtml = finalHtml; // Use the raw HTML
 
-        result[dir] = JSON.stringify(minifiedHtml);
+        result[dir] = JSON.stringify(unminifiedHtml); // Store the unminified HTML
     }
 
-    console.log('✅ Assets bundled successfuly!');
+    console.log('✅ Assets bundled successfully!');
     return result;
 }
 
@@ -69,38 +67,22 @@ async function buildWorker() {
             __ICON__: JSON.stringify(faviconBase64)
         }
     });
-    
-    console.log('✅ Worker built successfuly!');
+
+    console.log('✅ Worker built successfully!');
 
     let finalCode;
-    if (devMode) {
-        finalCode = code.outputFiles[0].text;
-    } else {
-        const minifiedCode = await jsMinify(code.outputFiles[0].text, {
-            module: true,
-            output: {
-                comments: false
-            }
-        });
-    
-        console.log('✅ Worker minified successfuly!');
-    
-        const obfuscationResult = obfs.obfuscate(minifiedCode.code, {
-            stringArrayThreshold: 1,
-            stringArrayEncoding: [
-                "rc4"
-            ],
-            numbersToExpressions: true,
-            transformObjectKeys: true,
-            renameGlobals: true,
-            deadCodeInjection: true,
-            deadCodeInjectionThreshold: 0.2,
-            target: "browser"
-        });
-    
-        console.log('✅ Worker obfuscated successfuly!');
-        finalCode = obfuscationResult.getObfuscatedCode();
-    }
+    // The devMode check now just determines if we take the esbuild output directly
+    // since minification and obfuscation steps are removed from the 'else' block.
+    // For consistency, we'll assign directly.
+    finalCode = code.outputFiles[0].text;
+
+    // Removed the entire `else` block containing jsMinify and obfuscation
+    // if (devMode) {
+    //     finalCode = code.outputFiles[0].text;
+    // } else {
+    //     // ... minification and obfuscation code removed ...
+    // }
+
 
     const worker = `// @ts-nocheck\n${finalCode}`;
     mkdirSync(DIST_PATH, { recursive: true });
@@ -110,7 +92,7 @@ async function buildWorker() {
     zip.file('_worker.js', worker);
     zip.generateAsync({
         type: 'nodebuffer',
-        compression: 'DEFLATE'
+        compression: 'DEFLATE' // You could also set this to 'STORE' for no compression if you truly want everything raw
     }).then(nodebuffer => writeFileSync('./dist/worker.zip', nodebuffer));
 
     console.log('✅ Done!');
